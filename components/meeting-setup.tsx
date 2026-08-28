@@ -3,9 +3,18 @@
 import { DeviceSettings, VideoPreview, useCall } from "@stream-io/video-react-sdk";
 import React, { useEffect, useState } from "react";
 import { Button } from "./ui/button";
+import type { WebinarIdentity } from "@/lib/auth/tokens";
 
-const MeetingSetup = ({ setIsSetupComplete }: { setIsSetupComplete: (value: boolean) => void }) => {
-  const [isMicCamToggledOn, setIsMicCamToggledOn] = useState(false);
+const MeetingSetup = ({
+  identity,
+  setIsSetupComplete,
+}: {
+  identity: WebinarIdentity;
+  setIsSetupComplete: (value: boolean) => void;
+}) => {
+  const isAttendee = identity.role === "attendee";
+  const [joinMuted, setJoinMuted] = useState(isAttendee);
+  const [joining, setJoining] = useState(false);
   const call = useCall();
 
   if (!call) {
@@ -13,41 +22,50 @@ const MeetingSetup = ({ setIsSetupComplete }: { setIsSetupComplete: (value: bool
   }
 
   useEffect(() => {
-    if (isMicCamToggledOn) {
+    if (joinMuted) {
       call?.camera.disable();
       call?.microphone.disable();
     } else {
       call?.camera.enable();
       call?.microphone.enable();
     }
-  }, [isMicCamToggledOn, call?.camera, call?.microphone]);
+  }, [joinMuted, call?.camera, call?.microphone]);
 
   return (
-    <div className="flex h-screen w-full flex-col items-center justify-center gap-3 text-white">
-      <h1 className="text-2xl font-bold">Setup</h1>
-      <VideoPreview />
+    <div className="meeting-setup-shell">
+      <div className="setup-heading">
+        <span className="eyebrow">Gerätecheck</span>
+        <h1>{isAttendee ? "Bereit für das Webinar?" : "Backstage vorbereiten"}</h1>
+        <p>{identity.name} · {isAttendee ? "Teilnahme" : "Host"}</p>
+      </div>
+      <div className="video-preview-frame"><VideoPreview /></div>
 
-      <div className="flex h-16 items-center justify-center gap-3">
-        <label className="flex items-center justify-center gap-2 font-medium">
+      <div className="setup-controls">
+        <label>
           <input
             type="checkbox"
-            checked={isMicCamToggledOn}
-            onChange={e => setIsMicCamToggledOn(e.target.checked)}
+            checked={joinMuted}
+            onChange={e => setJoinMuted(e.target.checked)}
           />
-          <span>Join with camera and microphone</span>
+          <span>Ohne Kamera und Mikrofon beitreten</span>
         </label>
         <DeviceSettings />
       </div>
 
       <Button
-        className="rounded-md bg-green-500 px-4 py-2.5"
-        onClick={() => {
-          call.join();
-
-          setIsSetupComplete(true);
+        className="setup-primary-action"
+        disabled={joining}
+        onClick={async () => {
+          setJoining(true);
+          try {
+            await call.join();
+            setIsSetupComplete(true);
+          } finally {
+            setJoining(false);
+          }
         }}
       >
-        Join Meeting
+        {joining ? "Verbindung wird hergestellt …" : isAttendee ? "Webinar beitreten" : "Backstage betreten"}
       </Button>
     </div>
   );

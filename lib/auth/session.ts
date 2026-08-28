@@ -1,0 +1,61 @@
+import "server-only";
+
+import { cookies } from "next/headers";
+import {
+  createSignedWebinarToken,
+  verifySignedWebinarToken,
+  type WebinarIdentity,
+} from "./tokens";
+
+export const WEBINAR_SESSION_COOKIE = "milton_webinar_session";
+const SESSION_AUDIENCE = "miltonticket-webinar-session";
+const SESSION_ISSUER = "miltonticket-webinar";
+const HANDOFF_AUDIENCE = "miltonticket-webinar-handoff";
+const HANDOFF_ISSUER = "miltonticket-app";
+
+function requiredSecret(name: "WEBINAR_SESSION_SECRET" | "MILTON_WEBINAR_HANDOFF_SECRET") {
+  const value = String(process.env[name] || "");
+  if (value.length < 32) throw new Error(`${name} ist nicht sicher konfiguriert.`);
+  return value;
+}
+
+export function openMiltonHandoff(token: string) {
+  return verifySignedWebinarToken(token, {
+    secret: requiredSecret("MILTON_WEBINAR_HANDOFF_SECRET"),
+    audience: HANDOFF_AUDIENCE,
+    issuer: HANDOFF_ISSUER,
+  });
+}
+
+export function createWebinarSessionToken(identity: WebinarIdentity, ttlSeconds = 8 * 60 * 60) {
+  return createSignedWebinarToken(identity, {
+    secret: requiredSecret("WEBINAR_SESSION_SECRET"),
+    audience: SESSION_AUDIENCE,
+    issuer: SESSION_ISSUER,
+    ttlSeconds,
+  });
+}
+
+export function readWebinarSessionToken(token: string) {
+  return verifySignedWebinarToken(token, {
+    secret: requiredSecret("WEBINAR_SESSION_SECRET"),
+    audience: SESSION_AUDIENCE,
+    issuer: SESSION_ISSUER,
+  });
+}
+
+export async function getWebinarSession(): Promise<WebinarIdentity | null> {
+  const token = (await cookies()).get(WEBINAR_SESSION_COOKIE)?.value;
+  if (!token) return null;
+  try {
+    return readWebinarSessionToken(token);
+  } catch {
+    return null;
+  }
+}
+
+export async function requireWebinarSession() {
+  const session = await getWebinarSession();
+  if (!session) throw new Error("Für diese Aktion ist eine Milton-Webinar-Sitzung erforderlich.");
+  return session;
+}

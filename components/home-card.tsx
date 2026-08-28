@@ -12,21 +12,20 @@ type HomeCardProps = {
 
 const HomeCard = ({ className, img, title, description, handleClick }: HomeCardProps) => {
   return (
-    <div
-      className={cn(
-        "px-4 py-6 flex flex-col justify-between w-full xl:max-w-[270px] min-h-[260px] rounded-[14px] cursor-pointer",
-        className
-      )}
+    <button
+      className={cn("webinar-action-row", className)}
+      onClick={handleClick}
+      type="button"
     >
-      <div className="flex-center glassmorphism size-12 rounded-[10px]" onClick={handleClick}>
-        <Image src={img} alt="meeting" width={27} height={27} />
+      <div className="webinar-action-icon">
+        <Image src={img} alt="" width={25} height={25} />
       </div>
-
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold">{title}</h1>
-        <p className="text-lg font-normal">{description}</p>
+      <div className="webinar-action-copy">
+        <h2>{title}</h2>
+        <p>{description}</p>
       </div>
-    </div>
+      <span className="webinar-action-arrow" aria-hidden="true">↗</span>
+    </button>
   );
 };
 

@@ -4,9 +4,8 @@ import Sidebar from "@/components/layout/sidebar";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "YOOM — One platform to connect",
-  description:
-    "Yoom is the leader in modern enterprise video communications, with an easy, reliable cloud platform for video and audio conferencing, chat, and webinars across mobile, desktop, and room systems.",
+  title: "Übersicht · Milton Webinare",
+  description: "Webinare planen, durchführen und nachbereiten.",
   icons: {
     icon: "/icons/logo.svg",
   },

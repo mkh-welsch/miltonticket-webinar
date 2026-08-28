@@ -8,6 +8,7 @@ import {
   PaginatedGridLayout,
   SpeakerLayout,
   useCallStateHooks,
+  useCall,
 } from "@stream-io/video-react-sdk";
 import {
   DropdownMenu,
@@ -20,19 +21,22 @@ import { LayoutList, Users } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import EndCallButton from "./end-call-button";
 import Loader from "./loader";
+import type { WebinarIdentity } from "@/lib/auth/tokens";
 
-type Props = {};
 type CallLayoutType = "grid" | "speaker-left" | "speaker-right";
 
-const MeetingRoom = (props: Props) => {
+const MeetingRoom = ({ identity }: { identity: WebinarIdentity }) => {
   const router = useRouter();
+  const call = useCall();
   const searchParams = useSearchParams();
   const isPersonalRoom = !!searchParams.get("personal");
   const [layout, setLayout] = useState<CallLayoutType>("speaker-left");
   const [showParticipants, setShowParticipants] = useState<boolean>(false);
 
-  const { useCallCallingState } = useCallStateHooks();
+  const { useCallCallingState, useIsCallLive } = useCallStateHooks();
   const callingState = useCallCallingState();
+  const isLive = useIsCallLive();
+  const isHost = identity.role === "host" || identity.role === "administrator";
 
   if (callingState !== CallingState.JOINED) return <Loader />;
 
@@ -49,6 +53,10 @@ const MeetingRoom = (props: Props) => {
 
   return (
     <section className="relative h-screen w-full overflow-hidden pt-4 text-white">
+      <div className="live-room-status">
+        <span className={isLive ? "live-indicator active" : "live-indicator"} />
+        <span>{isLive ? "Live" : isHost ? "Backstage" : "Warten auf den Host"}</span>
+      </div>
       <div className="relative flex size-full items-center justify-center">
         <div className="flex size-full max-w-[1000px] items-center">
           <CallLayout />
@@ -59,6 +67,15 @@ const MeetingRoom = (props: Props) => {
       </div>
 
       <div className="fixed bottom-0 flex w-full flex-wrap items-center justify-center gap-5">
+        {isHost && call && (
+          <button
+            className={isLive ? "broadcast-action stop" : "broadcast-action"}
+            onClick={() => isLive ? call.stopLive() : call.goLive({ start_recording: false })}
+            type="button"
+          >
+            {isLive ? "Übertragung stoppen" : "Webinar live schalten"}
+          </button>
+        )}
         <CallControls onLeave={() => router.push("/")} />
 
         <DropdownMenu>

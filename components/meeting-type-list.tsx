@@ -4,18 +4,15 @@ import React, { useState } from "react";
 import HomeCard from "./home-card";
 import { useRouter } from "next/navigation";
 import MeetingModal from "./meeting-modal";
-import { useUser } from "@clerk/nextjs";
-import { Call, useStreamVideoClient } from "@stream-io/video-react-sdk";
 import { useToast } from "./ui/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import ReactDatePicker from "react-datepicker";
 import { Input } from "./ui/input";
+import { createWebinar } from "@/actions/stream.actions";
 
 type Props = {};
 
 const MeetingTypeList = (props: Props) => {
-  const { user } = useUser();
-  const client = useStreamVideoClient();
   const router = useRouter();
   const { toast } = useToast();
   const [meetingState, setMeetingState] = useState<
@@ -26,11 +23,9 @@ const MeetingTypeList = (props: Props) => {
     description: "",
     link: "",
   });
-  const [callDetails, setCallDetails] = useState<Call>();
+  const [callDetails, setCallDetails] = useState<{ id: string }>();
 
   const createMeeting = async () => {
-    if (!client || !user) return;
-
     try {
       if (!values.dateTime) {
         toast({
@@ -39,69 +34,61 @@ const MeetingTypeList = (props: Props) => {
         return;
       }
 
-      const id = crypto.randomUUID();
-      const call = client.call("default", id);
-
-      if (!call) throw new Error("Failed to create call");
-
-      const startsAt = values.dateTime.toISOString() || new Date(Date.now()).toISOString();
-      const description = values.description || "Instnat Meeting";
-
-      await call.getOrCreate({
-        data: {
-          starts_at: startsAt,
-          custom: {
-            description,
-          },
-        },
+      const isInstant = meetingState === "isInstantMeeting";
+      const call = await createWebinar({
+        title: values.description || (isInstant ? "Sofort-Webinar" : "Milton Webinar"),
+        description: values.description,
+        startsAt: isInstant
+          ? new Date(Date.now() + 60_000).toISOString()
+          : values.dateTime.toISOString(),
+        recording: false,
       });
 
       setCallDetails(call);
 
-      if (!values.description) {
+      if (isInstant) {
         router.push(`/meeting/${call.id}`);
       }
 
       toast({
-        title: "Meeting created",
+        title: "Webinar wurde angelegt",
       });
     } catch (error) {
-      console.log(error);
       toast({
-        title: "Failed to create meeting",
+        title: error instanceof Error ? error.message : "Webinar konnte nicht angelegt werden",
       });
     }
   };
 
-  const meetingLink = `${process.env.NEXT_PUBLIC_BASE_URL}/meeting/${callDetails?.id}`;
+  const meetingLink = `${process.env.NEXT_PUBLIC_BASE_URL || ""}/meeting/${callDetails?.id}`;
 
   return (
-    <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+    <section className="webinar-action-list" aria-label="Webinar-Aktionen">
       <HomeCard
         img="/icons/add-meeting.svg"
-        title="New Meeting"
-        description="Start an instant meeting"
+        title="Sofort-Webinar"
+        description="Backstage direkt öffnen"
         handleClick={() => setMeetingState("isInstantMeeting")}
         className="bg-orange-1"
       />
       <HomeCard
         img="/icons/schedule.svg"
-        title="Schedule Meeting"
-        description="Plan your meeting"
+        title="Webinar planen"
+        description="Termin und Thema festlegen"
         handleClick={() => setMeetingState("isScheduleMeeting")}
         className="bg-blue-1"
       />
       <HomeCard
         img="/icons/recordings.svg"
-        title="View Recordings"
-        description="Check out your recordings"
+        title="Aufzeichnungen"
+        description="Vergangene Sessions ansehen"
         handleClick={() => router.push("/recordings")}
         className="bg-purple-1"
       />
       <HomeCard
         img="/icons/join-meeting.svg"
-        title="Join Meeting"
-        description="Via invite link"
+        title="Einladung öffnen"
+        description="Über sicheren Webinar-Link"
         handleClick={() => setMeetingState("isJoinMeeting")}
         className="bg-yellow-1"
       />
@@ -110,12 +97,12 @@ const MeetingTypeList = (props: Props) => {
         <MeetingModal
           isOpen={meetingState === "isScheduleMeeting"}
           onClose={() => setMeetingState(undefined)}
-          title="Create a Meeting"
+          title="Webinar planen"
           handleClick={createMeeting}
         >
           <div className="flex flex-col gap-2.5">
             <label className="text-base font-normal leading-[22px] text-sky-2">
-              Add a description
+              Titel und Thema
             </label>
             <Textarea
               className="border-none bg-dark-3 focus-visible:ring-0 focus-visible:ring-offset-0"
@@ -126,12 +113,12 @@ const MeetingTypeList = (props: Props) => {
           </div>
           <div className="flex w-full flex-col gap-2.5">
             <label className="text-base font-normal leading-[22px] text-sky-2">
-              Select a date and time
+              Datum und Uhrzeit
             </label>
             <ReactDatePicker
               selected={values.dateTime}
-              onChange={date => {
-                setValues({ ...values, dateTime: date! });
+              onChange={(date: Date | null) => {
+                if (date) setValues({ ...values, dateTime: date });
               }}
               showTimeSelect
               timeFormat="HH:mm"
@@ -146,36 +133,46 @@ const MeetingTypeList = (props: Props) => {
         <MeetingModal
           isOpen={meetingState === "isScheduleMeeting"}
           onClose={() => setMeetingState(undefined)}
-          title="Meeting Created"
+          title="Webinar ist geplant"
           className="text-center"
           handleClick={() => {
             navigator.clipboard.writeText(meetingLink);
-            toast({ title: "Linked copied" });
+            toast({ title: "Einladungslink kopiert" });
           }}
           image="/icons/checked.svg"
           buttonIcon="/icons/copy.svg"
-          buttonText="Copy Meeting Link"
+          buttonText="Einladungslink kopieren"
         />
       )}
       <MeetingModal
         isOpen={meetingState === "isInstantMeeting"}
         onClose={() => setMeetingState(undefined)}
-        title="Start an Instant Meeting"
+        title="Sofort-Webinar starten"
         className="text-center"
-        buttonText="Start Meeting"
+        buttonText="Backstage öffnen"
         handleClick={createMeeting}
       />
 
       <MeetingModal
         isOpen={meetingState === "isJoinMeeting"}
         onClose={() => setMeetingState(undefined)}
-        title="Type the meeting link to join"
+        title="Einladungslink öffnen"
         className="text-center"
-        buttonText="Join Meeting"
-        handleClick={() => router.push(values.link)}
+        buttonText="Webinar öffnen"
+        handleClick={() => {
+          try {
+            const invite = new URL(values.link, window.location.origin);
+            if (invite.origin !== window.location.origin || !/^\/meeting\/[a-zA-Z0-9_-]+$/.test(invite.pathname)) {
+              throw new Error();
+            }
+            router.push(invite.pathname);
+          } catch {
+            toast({ title: "Bitte einen gültigen Milton-Webinar-Link einfügen." });
+          }
+        }}
       >
         <Input
-          placeholder="Paste the meeting link here"
+          placeholder="https://webinar.miltonticket.app/meeting/…"
           className="border-none bg-dark-3 focus-visible:ring-0 focus-visible:ring-offset-0"
           onChange={e => setValues({ ...values, link: e.target.value })}
         />

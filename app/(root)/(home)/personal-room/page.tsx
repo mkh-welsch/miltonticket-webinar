@@ -1,67 +1,57 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createWebinar } from "@/actions/stream.actions";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import useGetCallById from "@/hooks/use-get-call-by-id";
-import { useUser } from "@clerk/nextjs";
-import { useStreamVideoClient } from "@stream-io/video-react-sdk";
-import { useRouter } from "next/navigation";
+import { useMiltonIdentity } from "@/providers/stream-client-provider";
 
-const Table = ({ title, description }: { title: string; description: string }) => (
-  <div className="flex flex-col items-start gap-2 xl:flex-row">
-    <h1 className="text-base font-medium text-sky-1 lg:text-xl xl:min-w-32">{title}:</h1>
-    <h1 className="truncate text-sm font-bold max-sm:max-w-[320px] lg:text-xl">{description}</h1>
+const Detail = ({ title, description }: { title: string; description: string }) => (
+  <div className="flex flex-col items-start gap-2 border-b border-white/10 pb-5 xl:flex-row">
+    <h2 className="text-sm font-medium uppercase tracking-[.12em] text-sky-1 xl:min-w-40">{title}</h2>
+    <p className="text-base font-semibold lg:text-lg">{description}</p>
   </div>
 );
 
 export default function PersonalRoom() {
   const router = useRouter();
-  const { user } = useUser();
+  const user = useMiltonIdentity();
   const { toast } = useToast();
-  const client = useStreamVideoClient();
-
-  const meetingId = user?.id;
-  const meetingLink = `${process.env.NEXT_PUBLIC_BASE_URL}/meeting/${meetingId}?personal=true`;
-
-  const { call } = useGetCallById(meetingId!);
+  const [pending, setPending] = useState(false);
 
   const startRoom = async () => {
-    if (!client || !user) return;
-
-    if (!call) {
-      const newCall = client.call("default", meetingId!);
-
-      await newCall.getOrCreate({
-        data: {
-          starts_at: new Date().toISOString(),
-        },
+    setPending(true);
+    try {
+      const webinar = await createWebinar({
+        title: `Sprechstunde mit ${user.name}`,
+        description: "Persönliche Milton Video-Sprechstunde",
+        startsAt: new Date(Date.now() + 60_000).toISOString(),
+        recording: false,
       });
+      router.push(`/meeting/${webinar.id}?personal=true`);
+    } catch (error) {
+      toast({
+        title: error instanceof Error ? error.message : "Sprechstunde konnte nicht geöffnet werden.",
+      });
+      setPending(false);
     }
-
-    router.push(`/meeting/${meetingId}?personal=true`);
   };
 
   return (
     <section className="flex size-full flex-col gap-10 text-white">
-      <h1 className="text-3xl font-bold">Personal Room</h1>
-
-      <div className="flex w-full flex-col gap-8 xl:max-w-[900px]">
-        <Table title="Topic" description={`${user?.username}'s meeting room`} />
-        <Table title="Meeting ID" description={meetingId as string} />
-        <Table title="Invite Link" description={meetingLink} />
+      <div>
+        <span className="eyebrow">Persönlicher Raum</span>
+        <h1 className="mt-3 text-3xl font-bold">Video-Sprechstunde</h1>
       </div>
-      <div className="flex gap-5">
-        <Button className="bg-blue-1" onClick={startRoom}>
-          Start Meeting
-        </Button>
-        <Button
-          className="bg-dark-3"
-          onClick={() => {
-            navigator.clipboard.writeText(meetingLink);
-            toast({ title: "Linked copied" });
-          }}
-        >
-          Copy Invite Link
+      <div className="flex w-full flex-col gap-5 xl:max-w-[900px]">
+        <Detail title="Host" description={user.name} />
+        <Detail title="Format" description="Persönlicher Live-Raum mit Einladungslink" />
+        <Detail title="Aufzeichnung" description="Standardmäßig ausgeschaltet" />
+      </div>
+      <div>
+        <Button className="bg-blue-1" disabled={pending} onClick={startRoom}>
+          {pending ? "Raum wird vorbereitet …" : "Sprechstunde starten"}
         </Button>
       </div>
     </section>

@@ -16,6 +16,7 @@ export default function useGetCallById(id: string | string[]) {
         const { calls } = await client.queryCalls({
           filter_conditions: {
             id,
+            type: "livestream",
           },
         });
 

@@ -13,6 +13,9 @@ export type WebinarIdentity = {
   streamToken?: string;
   streamApiKey?: string;
   streamCallType?: string;
+  streamTokenExpiresAt?: number;
+  sessionToken?: string;
+  sessionExpiresAt?: number;
   handoffJti?: string;
   handoffIat?: number;
   handoffExp?: number;
@@ -74,6 +77,9 @@ function normalizeIdentity(input: Partial<WebinarIdentity>): WebinarIdentity {
     ...(input.streamToken ? { streamToken: String(input.streamToken) } : {}),
     ...(input.streamApiKey ? { streamApiKey: String(input.streamApiKey) } : {}),
     ...(input.streamCallType ? { streamCallType: String(input.streamCallType) } : {}),
+    ...(Number.isInteger(input.streamTokenExpiresAt) ? { streamTokenExpiresAt: Number(input.streamTokenExpiresAt) } : {}),
+    ...(input.sessionToken ? { sessionToken: String(input.sessionToken) } : {}),
+    ...(Number.isInteger(input.sessionExpiresAt) ? { sessionExpiresAt: Number(input.sessionExpiresAt) } : {}),
     ...(input.handoffJti ? { handoffJti: String(input.handoffJti) } : {}),
     ...(Number.isInteger(input.handoffIat) ? { handoffIat: Number(input.handoffIat) } : {}),
     ...(Number.isInteger(input.handoffExp) ? { handoffExp: Number(input.handoffExp) } : {}),

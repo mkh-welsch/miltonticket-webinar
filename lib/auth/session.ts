@@ -56,6 +56,26 @@ export async function consumeMiltonHandoff(token: string, callId: string) {
   return payload;
 }
 
+export async function refreshMiltonStreamToken(sessionToken: string, callId: string) {
+  const configured = String(process.env.MILTON_API_BASE_URL || "").trim();
+  let baseUrl: URL;
+  try { baseUrl = new URL(configured); } catch { throw new Error("MILTON_API_BASE_URL ist ungültig."); }
+  if (baseUrl.protocol !== "https:" || baseUrl.username || baseUrl.password || baseUrl.search || baseUrl.hash) throw new Error("MILTON_API_BASE_URL muss eine vertrauenswürdige HTTPS-Origin sein.");
+  const allowlist = String(process.env.MILTON_API_ALLOWED_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean);
+  if (allowlist.length && !allowlist.includes(baseUrl.origin)) throw new Error("MILTON_API_BASE_URL ist nicht freigegeben.");
+  const response = await fetch(`${baseUrl.origin}/api/webinars/${encodeURIComponent(callId)}/token`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${sessionToken}`, "content-type": "application/json" },
+    body: "{}",
+    cache: "no-store",
+    signal: AbortSignal.timeout(4_000),
+  });
+  if (!response.ok) throw new Error("Das Webinar-Token konnte nicht erneuert werden.");
+  const payload = await response.json() as Record<string, unknown>;
+  if (!payload.streamToken || payload.callId !== callId) throw new Error("Das Webinar-Token ist unvollständig.");
+  return payload;
+}
+
 export function createWebinarSessionToken(identity: WebinarIdentity, ttlSeconds = 8 * 60 * 60) {
   return createSignedWebinarToken(identity, {
     secret: requiredSecret("WEBINAR_SESSION_SECRET"),

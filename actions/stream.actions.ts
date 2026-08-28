@@ -1,7 +1,7 @@
 "use server";
 
 import crypto from "node:crypto";
-import { requireWebinarSession } from "@/lib/auth/session";
+import { refreshMiltonStreamToken, requireWebinarSession } from "@/lib/auth/session";
 import { canManageWebinars } from "@/lib/webinar/access";
 import {
   recordingEnabled,
@@ -26,7 +26,7 @@ async function miltonWebinarRequest(path: string, user: WebinarIdentity, body: R
     headers: {
       "content-type": "application/json",
       "idempotency-key": idempotencyKey,
-      ...(user.handoffToken ? { authorization: `Bearer ${user.handoffToken}` } : {}),
+      ...((user.sessionToken || user.handoffToken) ? { authorization: `Bearer ${user.sessionToken || user.handoffToken}` } : {}),
     },
     body: rawBody,
     cache: "no-store",
@@ -44,7 +44,12 @@ function stableIdempotencyKey(operation: string, user: WebinarIdentity, body: Re
 
 export default async function tokenProvider() {
   const user = await requireWebinarSession();
-  if (user.streamToken) return user.streamToken;
+  const now = Math.floor(Date.now() / 1000);
+  if (user.streamToken && Number(user.streamTokenExpiresAt || 0) > now + 30) return user.streamToken;
+  if (user.sessionToken && user.callIds[0]) {
+    const refreshed = await refreshMiltonStreamToken(user.sessionToken, user.callIds[0]);
+    return String(refreshed.streamToken);
+  }
   const client = streamServerClient();
   await provisionStreamIdentity(user);
   const exp = Math.round(new Date().getTime() / 1000) + 60 * 60;
@@ -61,7 +66,7 @@ export async function createWebinar(input: {
   recording?: boolean;
 }) {
   const user = await requireWebinarSession();
-  if (!canManageWebinars(user)) throw new Error("Diese Rolle darf keine Webinare anlegen.");
+  if (!canManageWebinars(user) || user.role !== "administrator") throw new Error("Nur Administratoren dürfen Webinare anlegen.");
 
   const title = String(input.title || "").trim().slice(0, 160);
   const description = String(input.description || "").trim().slice(0, 1000);

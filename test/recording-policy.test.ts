@@ -45,6 +45,26 @@ test("rejects missing consent, future timestamps and excessive retention", () =>
   assert.equal(recordingConsentFromCustom({ tenant_id: "milton-production" }), null);
 });
 
+test("normalizes the canonical Milton consent DTO for grant and revoke", () => {
+  const granted = normalizeRecordingConsent({
+    tenantId: "milton-production",
+    registrationId: "registration-123",
+    status: "granted",
+    receiptId: "consent-receipt-123",
+    capturedAt: "2026-08-28T09:55:00Z",
+  }, { now, maxRetentionDays: 30, requireRegistrationId: true });
+  assert.equal(granted.registrationId, "registration-123");
+  assert.equal(granted.status, "granted");
+  const revoked = normalizeRecordingConsent({
+    tenantId: "milton-production",
+    registrationId: "registration-123",
+    status: "revoked",
+    revokedAt: "2026-08-28T09:59:00Z",
+  }, { now, maxRetentionDays: 30, requireRegistrationId: true });
+  assert.equal(revoked.revokedAt, "2026-08-28T09:59:00.000Z");
+  assert.equal(revoked.status, "revoked");
+});
+
 test("normalizes only explicit recording deletion reasons", () => {
   const deletion = normalizeRecordingDeletion({
     tenantId: "milton-production",

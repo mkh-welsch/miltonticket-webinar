@@ -133,6 +133,6 @@ export function miltonEventEndpoint(baseUrl: string, allowHttp = false) {
   }
   if (url.search || url.hash) throw new Error("MILTON_API_BASE_URL darf keine Query oder Fragment enthalten.");
   const allowlist = String(process.env.MILTON_API_ALLOWED_ORIGINS || "").split(",").map(origin => origin.trim()).filter(Boolean);
-  if (allowlist.length && !allowlist.includes(url.origin)) throw new Error("MILTON_API_BASE_URL ist nicht freigegeben.");
+  if (!allowlist.length || !allowlist.includes(url.origin)) throw new Error("MILTON_API_BASE_URL ist nicht freigegeben.");
   return new URL("/api/webinars/events", url.origin).toString();
 }

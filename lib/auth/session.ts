@@ -41,7 +41,7 @@ export async function consumeMiltonHandoff(token: string, callId: string) {
     throw new Error("MILTON_API_BASE_URL muss eine vertrauenswürdige HTTPS-Origin sein.");
   }
   const allowlist = String(process.env.MILTON_API_ALLOWED_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean);
-  if (allowlist.length && !allowlist.includes(baseUrl.origin)) throw new Error("MILTON_API_BASE_URL ist nicht freigegeben.");
+  if (!allowlist.length || !allowlist.includes(baseUrl.origin)) throw new Error("MILTON_API_BASE_URL ist nicht freigegeben.");
   const stableKey = `handoff-consume-${crypto.createHash("sha256").update(token).digest("hex").slice(0, 48)}`;
   const response = await fetch(`${baseUrl.origin}/api/webinars/${encodeURIComponent(callId)}/handoff/consume`, {
     method: "POST",

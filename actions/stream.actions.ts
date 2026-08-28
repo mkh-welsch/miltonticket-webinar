@@ -15,7 +15,7 @@ function miltonApiBaseUrl() {
   try { url = new URL(value); } catch { throw new Error("MILTON_API_BASE_URL ist ungültig."); }
   if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) throw new Error("MILTON_API_BASE_URL muss eine vertrauenswürdige HTTPS-Origin sein.");
   const allowlist = String(process.env.MILTON_API_ALLOWED_ORIGINS || "").split(",").map(origin => origin.trim()).filter(Boolean);
-  if (allowlist.length && !allowlist.includes(url.origin)) throw new Error("MILTON_API_BASE_URL ist nicht freigegeben.");
+  if (!allowlist.length || !allowlist.includes(url.origin)) throw new Error("MILTON_API_BASE_URL ist nicht freigegeben.");
   return url.origin;
 }
 

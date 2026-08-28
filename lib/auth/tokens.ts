@@ -10,6 +10,16 @@ export type WebinarIdentity = {
   role: WebinarRole;
   tenantId: string;
   callIds: string[];
+  streamToken?: string;
+  streamApiKey?: string;
+  streamCallType?: string;
+  streamTokenExpiresAt?: number;
+  sessionToken?: string;
+  sessionExpiresAt?: number;
+  handoffJti?: string;
+  handoffIat?: number;
+  handoffExp?: number;
+  handoffToken?: string;
 };
 
 type SignedClaims = WebinarIdentity & {
@@ -18,6 +28,7 @@ type SignedClaims = WebinarIdentity & {
   iss: string;
   iat: number;
   exp: number;
+  jti?: string;
 };
 
 const ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:@-]{1,199}$/;
@@ -56,7 +67,24 @@ function normalizeIdentity(input: Partial<WebinarIdentity>): WebinarIdentity {
   }
   if (callIds.length > 50) throw new Error("Das Zugriffsticket enthält zu viele Webinare.");
 
-  return { sub, email, name, role, tenantId, callIds };
+  return {
+    sub,
+    email,
+    name,
+    role,
+    tenantId,
+    callIds,
+    ...(input.streamToken ? { streamToken: String(input.streamToken) } : {}),
+    ...(input.streamApiKey ? { streamApiKey: String(input.streamApiKey) } : {}),
+    ...(input.streamCallType ? { streamCallType: String(input.streamCallType) } : {}),
+    ...(Number.isInteger(input.streamTokenExpiresAt) ? { streamTokenExpiresAt: Number(input.streamTokenExpiresAt) } : {}),
+    ...(input.sessionToken ? { sessionToken: String(input.sessionToken) } : {}),
+    ...(Number.isInteger(input.sessionExpiresAt) ? { sessionExpiresAt: Number(input.sessionExpiresAt) } : {}),
+    ...(input.handoffJti ? { handoffJti: String(input.handoffJti) } : {}),
+    ...(Number.isInteger(input.handoffIat) ? { handoffIat: Number(input.handoffIat) } : {}),
+    ...(Number.isInteger(input.handoffExp) ? { handoffExp: Number(input.handoffExp) } : {}),
+    ...(input.handoffToken ? { handoffToken: String(input.handoffToken) } : {}),
+  };
 }
 
 export function createSignedWebinarToken(
@@ -72,7 +100,7 @@ export function createSignedWebinarToken(
   assertSecret(options.secret);
   const normalized = normalizeIdentity(identity);
   const issuedAt = Math.floor((options.now || new Date()).getTime() / 1000);
-  const ttlSeconds = Math.max(60, Math.min(24 * 60 * 60, Number(options.ttlSeconds || 600)));
+  const ttlSeconds = Math.max(30, Math.min(24 * 60 * 60, Number(options.ttlSeconds || 600)));
   const claims: SignedClaims = {
     v: 1,
     ...normalized,
@@ -129,5 +157,10 @@ export function verifySignedWebinarToken(
     throw new Error("Das Webinar-Zugriffsticket ist abgelaufen oder nicht für diese Anwendung bestimmt.");
   }
 
-  return normalizeIdentity(claims);
+  return normalizeIdentity({
+    ...claims,
+    ...(options.audience === "miltonticket-webinar-handoff" && claims.jti ? { handoffJti: claims.jti } : {}),
+    ...(options.audience === "miltonticket-webinar-handoff" && Number.isInteger(claims.iat) ? { handoffIat: Number(claims.iat) } : {}),
+    ...(options.audience === "miltonticket-webinar-handoff" && Number.isInteger(claims.exp) ? { handoffExp: Number(claims.exp) } : {}),
+  });
 }

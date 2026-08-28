@@ -16,6 +16,7 @@ export type WebinarIdentity = {
   handoffJti?: string;
   handoffIat?: number;
   handoffExp?: number;
+  handoffToken?: string;
 };
 
 type SignedClaims = WebinarIdentity & {
@@ -76,6 +77,7 @@ function normalizeIdentity(input: Partial<WebinarIdentity>): WebinarIdentity {
     ...(input.handoffJti ? { handoffJti: String(input.handoffJti) } : {}),
     ...(Number.isInteger(input.handoffIat) ? { handoffIat: Number(input.handoffIat) } : {}),
     ...(Number.isInteger(input.handoffExp) ? { handoffExp: Number(input.handoffExp) } : {}),
+    ...(input.handoffToken ? { handoffToken: String(input.handoffToken) } : {}),
   };
 }
 

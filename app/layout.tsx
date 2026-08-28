@@ -4,15 +4,13 @@ import { Inter } from "next/font/google";
 import "@stream-io/video-react-sdk/dist/css/styles.css";
 import "react-datepicker/dist/react-datepicker.css";
 import "./globals.css";
-import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/toaster";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "YOOM — One platform to connect",
-  description:
-    "Yoom is the leader in modern enterprise video communications, with an easy, reliable cloud platform for video and audio conferencing, chat, and webinars across mobile, desktop, and room systems.",
+  title: "Milton Webinare",
+  description: "White-Label-Webinare und Video-Sprechstunden für Milton Ticket.",
   icons: {
     icon: "/icons/logo.svg",
   },
@@ -24,27 +22,11 @@ export default function AppLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <ClerkProvider
-        appearance={{
-          layout: {
-            logoImageUrl: "/icons/yoom-logo.svg",
-            socialButtonsVariant: "iconButton",
-          },
-          variables: {
-            colorText: "#fff",
-            colorPrimary: "#0e78f9",
-            colorBackground: "#1c1f2e",
-            colorInputBackground: "#252a41",
-            colorInputText: "#fff",
-          },
-        }}
-      >
-        <body className={`${inter.className} bg-dark-2`}>
-          {children}
-          <Toaster />
-        </body>
-      </ClerkProvider>
+    <html lang="de">
+      <body className={`${inter.className} bg-dark-2`}>
+        {children}
+        <Toaster />
+      </body>
     </html>
   );
 }

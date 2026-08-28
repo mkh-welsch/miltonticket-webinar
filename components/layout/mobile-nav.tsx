@@ -30,10 +30,10 @@ const MobileNav = (props: Props) => {
               src={"/icons/logo.svg"}
               width={32}
               height={32}
-              alt="Yoom"
+              alt="Milton Ticket"
               className="max-sm:size-10"
             />
-            <p className="text-[26px] font-extrabold text-white">Yoom</p>
+            <p className="text-[22px] font-bold text-white">Milton Webinare</p>
           </Link>
 
           <div className="flex h-[calc(100vh-72px)] flex-col justify-between overflow-y-auto">

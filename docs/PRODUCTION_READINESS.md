@@ -1,0 +1,37 @@
+# Production Readiness
+
+Der Status bleibt **nicht production ready**, bis alle Gates bestanden sind.
+
+## Provider und Datenschutz
+
+- Stream-Vertrag, AVV/DPA, Subprozessoren, Region und Löschfristen freigegeben.
+- `livestream`-Call-Type mit Backstage sowie minimalen Host-/Teilnehmer-Capabilities geprüft.
+- Host- und Teilnehmerzugriff gegen Call-Mandant und Mitgliedschaft begrenzt; keine mandantenübergreifende Call-Abfrage erlaubt.
+- Aufzeichnung und Transkription standardmäßig aus; explizite Einwilligungs- und Hinweistexte vorhanden.
+- Aufbewahrung, Export, Löschung und Incident-Prozess für Aufzeichnungen dokumentiert.
+- Browserrollen besitzen keine direkte Stream-Capability zum Starten einer Aufzeichnung; Aufnahme und Löschung laufen ausschließlich über die signierte Milton-Steuerung.
+- Kostenalarm und monatliches Minutenbudget eingerichtet. Das Stream-Freikontingent ist kein SLA.
+
+## Deployment
+
+- Eigenes Vercel-Projekt mit Preview, Staging und Production.
+- GitHub-Environment `webinar-preview` mit Required Reviewers und getrennten Vercel-Secrets eingerichtet; manuelle Preview nur für den freigegebenen PR-Head-SHA auslösen.
+- Production-Domain `webinar.miltonticket.app`, TLS, CSP und erlaubte Origins geprüft.
+- CSP erlaubt Stream-Signaling nur zu den offiziellen `stream-io-video.com`, `stream-io-api.com` und `getstream.io`-Hosts; Abweichungen werden in der Preview-Browserkonsole geprüft.
+- Secrets pro Umgebung getrennt; keine Preview-Secrets in Production.
+- Stream-Webhooks auf stabile HTTPS-Route mit Signaturprüfung konfiguriert.
+- Monitoring für Handoff-, Token-, Provider-, Recording- und Webhook-Fehler aktiv.
+
+## Browser-E2E
+
+Jeweils in frischem Browserprofil und mit Console-/Network-Aufzeichnung:
+
+1. Host-Handoff → Reload → Webinar planen → Backstage → live → Bildschirmfreigabe → beenden → Logout → geschützte Route blockiert.
+2. Teilnehmer-Handoff → nur erlaubtes Webinar sichtbar → Beitritt ohne Mic/Kamera → unerlaubte Webinar-ID ergibt 404 → Logout/Reload blockiert.
+3. Zwei Browser/Geräte: Host live, Teilnehmer empfängt Audio/Video, Reconnect nach Netzunterbrechung.
+4. Aufzeichnung mit sichtbarer Einwilligung starten → bereit → im CRM verknüpft → Zugriff rollenbegrenzt → Löschung nachweisbar.
+5. Registrant nimmt teil und verlässt den Call → CRM zeigt Teilnahmezeiten genau einmal; No-show bleibt korrekt.
+
+## Release-Gate
+
+Erst wenn Build, Tests, Security-/Dependency-Audit, Staging-E2E und ein echtes Zwei-Geräte-Webinar mit CRM-Rückfluss bestanden sind, darf der Status „production ready“ verwendet werden.

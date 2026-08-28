@@ -6,28 +6,28 @@ type TSidebarLinks = {
 
 export const sidebarLinks: TSidebarLinks[] = [
   {
-    label: "Home",
+    label: "Übersicht",
     route: "/",
     imgUrl: "/icons/Home.svg",
   },
 
   {
-    label: "Upcoming",
+    label: "Geplant",
     route: "/upcoming",
     imgUrl: "/icons/upcoming.svg",
   },
   {
-    label: "Previous",
+    label: "Vergangen",
     route: "/previous",
     imgUrl: "/icons/previous.svg",
   },
   {
-    label: "Recordings",
+    label: "Aufzeichnungen",
     route: "/recordings",
     imgUrl: "/icons/Video.svg",
   },
   {
-    label: "Personal Room",
+    label: "Sprechstunde",
     route: "/personal-room",
     imgUrl: "/icons/add-personal.svg",
   },

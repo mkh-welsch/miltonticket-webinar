@@ -1,0 +1,150 @@
+name: Manual Vercel Preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Full 40-character SHA approved for this preview
+        required: true
+        type: string
+      pull_request_number:
+        description: Pull request whose head must equal commit_sha
+        required: true
+        type: string
+      approval_reference:
+        description: Reference to the explicit deployment approval
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+
+concurrency:
+  group: webinar-preview
+  cancel-in-progress: false
+
+jobs:
+  deploy-preview:
+    name: Deploy approved PR commit to Preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: webinar-preview
+
+    steps:
+      - name: Validate approval, pull request and successful quality check
+        id: approval
+        uses: actions/github-script@v9
+        env:
+          APPROVED_SHA: ${{ inputs.commit_sha }}
+          APPROVED_PR: ${{ inputs.pull_request_number }}
+          APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
+        with:
+          script: |
+            const sha = process.env.APPROVED_SHA.trim();
+            const pullNumber = Number(process.env.APPROVED_PR);
+            const approvalReference = process.env.APPROVAL_REFERENCE.trim();
+
+            if (!/^[a-f0-9]{40}$/.test(sha)) {
+              core.setFailed("commit_sha must be a full lowercase 40-character Git SHA.");
+              return;
+            }
+            if (!Number.isInteger(pullNumber) || pullNumber < 1) {
+              core.setFailed("pull_request_number must be a positive integer.");
+              return;
+            }
+            if (approvalReference.length < 3) {
+              core.setFailed("approval_reference must identify the explicit approval.");
+              return;
+            }
+
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pullNumber,
+            });
+            const isReviewable = pull.state === "open" && !pull.draft;
+            if (!isReviewable && !pull.merged) {
+              core.setFailed("The referenced pull request must be reviewable or merged, never closed unmerged.");
+              return;
+            }
+            if (pull.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              core.setFailed("The pull request head must belong to this repository.");
+              return;
+            }
+            if (pull.head.sha !== sha) {
+              core.setFailed("commit_sha must exactly match the current pull request head.");
+              return;
+            }
+
+            const { data: checks } = await github.rest.checks.listForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: sha,
+              per_page: 100,
+            });
+            const quality = checks.check_runs.find(
+              run => run.name === "Lint, test, build and audit" && run.conclusion === "success",
+            );
+            if (!quality) {
+              core.setFailed("The exact commit must have a successful Quality check before deployment.");
+              return;
+            }
+
+            core.setOutput("head_ref", pull.head.ref);
+            core.info(`Validated PR #${pullNumber}, commit ${sha}, approval ${approvalReference}.`);
+
+      - name: Check out the exact approved commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6.0.9
+        with:
+          version: 10.33.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Verify required Vercel secrets
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          test -n "$VERCEL_TOKEN"
+          test -n "$VERCEL_ORG_ID"
+          test -n "$VERCEL_PROJECT_ID"
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Pull Preview configuration
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          PREVIEW_BRANCH: ${{ steps.approval.outputs.head_ref }}
+        run: pnpm exec vercel pull --yes --environment=preview --git-branch="$PREVIEW_BRANCH" --token="$VERCEL_TOKEN"
+
+      - name: Build Preview artifact
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: pnpm exec vercel build --target=preview --token="$VERCEL_TOKEN"
+
+      - name: Deploy Preview artifact
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: pnpm exec vercel deploy --prebuilt --archive=tgz --token="$VERCEL_TOKEN"

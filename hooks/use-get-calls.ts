@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 
 import { Call, useStreamVideoClient } from "@stream-io/video-react-sdk";
-import { useUser } from "@clerk/nextjs";
+import { useMiltonIdentity } from "@/providers/stream-client-provider";
 
 export default function useGetCalls() {
-  const { user } = useUser();
+  const user = useMiltonIdentity();
   const [calls, setCalls] = useState<Call[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -12,7 +12,7 @@ export default function useGetCalls() {
 
   useEffect(() => {
     const loadCalls = async () => {
-      if (!client || !user?.id) return;
+      if (!client || !user.sub) return;
 
       setIsLoading(true);
 
@@ -21,7 +21,8 @@ export default function useGetCalls() {
           sort: [{ field: "starts_at", direction: -1 }],
           filter_conditions: {
             starts_at: { $exists: true },
-            $or: [{ created_by_user_id: user.id }, { members: { $in: [user.id] } }],
+            type: "livestream",
+            $or: [{ created_by_user_id: user.sub }, { members: { $in: [user.sub] } }],
           },
         });
 
@@ -34,7 +35,7 @@ export default function useGetCalls() {
     };
 
     loadCalls();
-  }, [client, user?.id]);
+  }, [client, user.sub]);
 
   const now = new Date();
 

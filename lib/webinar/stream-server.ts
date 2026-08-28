@@ -28,10 +28,11 @@ export function streamServerClient() {
 
 export async function provisionStreamIdentity(identity: WebinarIdentity) {
   const client = streamServerClient();
+  const streamRole = identity.role === "administrator" ? "admin" : identity.role === "host" ? "host" : "user";
   await client.upsertUsers([{
     id: identity.sub,
     name: identity.name,
-    role: "user",
+    role: streamRole,
     custom: {
       milton_role: identity.role,
       tenant_id: identity.tenantId,

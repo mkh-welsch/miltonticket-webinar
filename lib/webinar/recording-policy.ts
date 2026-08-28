@@ -6,6 +6,10 @@ export type RecordingConsent = {
   noticeVersion: string;
   consentedAt: string;
   retentionDays: number;
+  registrationId: string;
+  status: "granted" | "revoked";
+  capturedAt?: string;
+  revokedAt?: string;
 };
 
 export type RecordingDeletion = {
@@ -29,21 +33,28 @@ export function recordingEnabled() {
 }
 
 export function normalizeRecordingConsent(
-  input: Partial<RecordingConsent>,
-  options: { now?: Date; maxRetentionDays?: number } = {},
+  input: Partial<RecordingConsent> & Record<string, unknown>,
+  options: { now?: Date; maxRetentionDays?: number; requireRegistrationId?: boolean } = {},
 ): RecordingConsent {
   const receiptId = String(input.receiptId || "").trim();
   const tenantId = String(input.tenantId || "").trim().toLowerCase();
-  const noticeVersion = String(input.noticeVersion || "").trim();
-  const consentedAt = new Date(String(input.consentedAt || ""));
-  const retentionDays = Number(input.retentionDays);
+  const registrationId = String(input.registrationId || (options.requireRegistrationId ? "" : `legacy-${receiptId}`)).trim();
+  const status = String(input.status || "granted") as RecordingConsent["status"];
+  const noticeVersion = String(input.noticeVersion || "milton-recording-v1").trim();
+  const capturedAt = String(input.capturedAt || input.consentedAt || "").trim();
+  const revokedAt = String(input.revokedAt || "").trim();
+  const consentedAt = new Date(capturedAt);
+  const retentionDays = Number(input.retentionDays || options.maxRetentionDays || recordingMaxRetentionDays());
   const maxRetentionDays = options.maxRetentionDays || recordingMaxRetentionDays();
   const now = options.now || new Date();
 
-  if (!RECEIPT_PATTERN.test(receiptId)) throw new Error("Ungültige Einwilligungsquittung.");
+  if (status === "granted" && !RECEIPT_PATTERN.test(receiptId)) throw new Error("Ungültige Einwilligungsquittung.");
   if (!TENANT_PATTERN.test(tenantId)) throw new Error("Ungültiger Webinar-Mandant.");
-  if (!NOTICE_PATTERN.test(noticeVersion)) throw new Error("Ungültige Aufnahmehinweis-Version.");
-  if (Number.isNaN(consentedAt.getTime()) || consentedAt.getTime() > now.getTime() + 5 * 60_000) {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._:-]{1,199}$/.test(registrationId)) throw new Error("Ungültige Webinar-Registrierung.");
+  if (!["granted", "revoked"].includes(status)) throw new Error("Ungültiger Einwilligungsstatus.");
+  if (status === "granted" && !NOTICE_PATTERN.test(noticeVersion)) throw new Error("Ungültige Aufnahmehinweis-Version.");
+  const eventAt = status === "revoked" ? new Date(revokedAt || capturedAt) : consentedAt;
+  if (Number.isNaN(eventAt.getTime()) || eventAt.getTime() > now.getTime() + 5 * 60_000) {
     throw new Error("Ungültiger Einwilligungszeitpunkt.");
   }
   if (!Number.isInteger(retentionDays) || retentionDays < 1 || retentionDays > maxRetentionDays) {
@@ -54,8 +65,12 @@ export function normalizeRecordingConsent(
     receiptId,
     tenantId,
     noticeVersion,
-    consentedAt: consentedAt.toISOString(),
+    consentedAt: (Number.isNaN(consentedAt.getTime()) ? eventAt : consentedAt).toISOString(),
     retentionDays,
+    registrationId,
+    status,
+    capturedAt: status === "granted" ? consentedAt.toISOString() : undefined,
+    revokedAt: status === "revoked" ? eventAt.toISOString() : undefined,
   };
 }
 
@@ -75,6 +90,8 @@ export function recordingConsentFromCustom(custom: Record<string, unknown>) {
 
 export function recordingConsentCustom(consent: RecordingConsent, idempotencyKey: string, rawBody: string) {
   return {
+    registration_id: consent.registrationId,
+    recording_consent_status: consent.status,
     recording_consent_receipt_id: consent.receiptId,
     recording_consent_notice_version: consent.noticeVersion,
     recording_consented_at: consent.consentedAt,

@@ -34,11 +34,18 @@ export function openMiltonHandoff(token: string) {
 }
 
 export async function consumeMiltonHandoff(token: string, callId: string) {
-  const baseUrl = String(process.env.MILTON_API_BASE_URL || "").trim().replace(/\/$/, "");
-  if (!baseUrl) throw new Error("MILTON_API_BASE_URL ist nicht konfiguriert.");
-  const response = await fetch(`${baseUrl}/api/webinars/${encodeURIComponent(callId)}/handoff/consume`, {
+  const configured = String(process.env.MILTON_API_BASE_URL || "").trim();
+  let baseUrl: URL;
+  try { baseUrl = new URL(configured); } catch { throw new Error("MILTON_API_BASE_URL ist ungültig."); }
+  if (baseUrl.protocol !== "https:" || baseUrl.username || baseUrl.password || baseUrl.search || baseUrl.hash) {
+    throw new Error("MILTON_API_BASE_URL muss eine vertrauenswürdige HTTPS-Origin sein.");
+  }
+  const allowlist = String(process.env.MILTON_API_ALLOWED_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean);
+  if (allowlist.length && !allowlist.includes(baseUrl.origin)) throw new Error("MILTON_API_BASE_URL ist nicht freigegeben.");
+  const stableKey = `handoff-consume-${crypto.createHash("sha256").update(token).digest("hex").slice(0, 48)}`;
+  const response = await fetch(`${baseUrl.origin}/api/webinars/${encodeURIComponent(callId)}/handoff/consume`, {
     method: "POST",
-    headers: { "content-type": "application/json", "idempotency-key": `handoff-${crypto.randomUUID()}` },
+    headers: { "content-type": "application/json", "idempotency-key": stableKey },
     body: JSON.stringify({ token }),
     cache: "no-store",
     signal: AbortSignal.timeout(4_000),

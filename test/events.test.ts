@@ -115,3 +115,15 @@ test("Milton event delivery requires HTTPS outside local development", () => {
   assert.throws(() => miltonEventEndpoint("http://miltonticket.app"), /HTTPS/);
   assert.throws(() => miltonEventEndpoint("https://user:password@miltonticket.app"), /HTTPS/);
 });
+
+test("Milton event delivery enforces the configured exact-origin allowlist", () => {
+  const previous = process.env.MILTON_API_ALLOWED_ORIGINS;
+  process.env.MILTON_API_ALLOWED_ORIGINS = "https://miltonticket.app";
+  try {
+    assert.equal(miltonEventEndpoint("https://miltonticket.app"), "https://miltonticket.app/api/webinars/events");
+    assert.throws(() => miltonEventEndpoint("https://evil.example"), /freigegeben/);
+  } finally {
+    if (previous === undefined) delete process.env.MILTON_API_ALLOWED_ORIGINS;
+    else process.env.MILTON_API_ALLOWED_ORIGINS = previous;
+  }
+});

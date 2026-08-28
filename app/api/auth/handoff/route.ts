@@ -17,13 +17,23 @@ export async function GET(request: NextRequest) {
     const callId = identity.callIds[0];
     if (!callId) throw new Error("Das Handoff enthält keinen Webinar-Call.");
     const consumed = await consumeMiltonHandoff(token, callId);
+    const consumedCallId = String(consumed.callId || "");
+    const consumedSubject = String(consumed.subject || "");
+    const consumedTenant = String(consumed.tenantId || "");
+    const consumedRole = String(consumed.role || "");
+    const consumedExp = Number(consumed.expiresAt || 0);
+    const consumedIat = Number(consumed.issuedAt || 0);
+    if (consumedCallId !== callId || consumedSubject !== identity.sub || consumedTenant !== identity.tenantId || consumedRole !== identity.role || !Number.isInteger(consumedIat) || consumedIat < Number(identity.handoffIat || 0) || !Number.isInteger(consumedExp) || consumedExp > Number(identity.handoffExp || 0)) {
+      throw new Error("Das Webinar-Handoff enthält widersprüchliche Claims.");
+    }
     const sessionIdentity = {
       ...identity,
       streamToken: String(consumed.streamToken),
-      streamApiKey: String(consumed.streamApiKey || ""),
-      streamCallType: String(consumed.streamCallType || "livestream"),
+      streamApiKey: String(consumed.apiKey || consumed.streamApiKey || ""),
+      streamCallType: String(consumed.callType || consumed.streamCallType || "livestream"),
       handoffIat: Number(consumed.issuedAt || identity.handoffIat),
       handoffExp: Number(consumed.expiresAt || identity.handoffExp),
+      handoffToken: token,
     };
     await provisionStreamIdentity(sessionIdentity);
     const returnTo = safeReturnPath(

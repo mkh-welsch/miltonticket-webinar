@@ -1,24 +1,16 @@
-import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyMiltonControlRequest } from "@/lib/webinar/control-auth";
 import {
   normalizeRecordingConsent,
-  recordingConsentCustom,
   recordingMaxRetentionDays,
 } from "@/lib/webinar/recording-policy";
-import { streamServerClient } from "@/lib/webinar/stream-server";
+import { forwardMiltonControl } from "@/lib/milton-api";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const CALL_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,127}$/;
 const IDEMPOTENCY_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{7,199}$/;
-
-function safeEqual(left: string, right: string) {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
-}
 
 export async function POST(
   request: NextRequest,
@@ -60,29 +52,9 @@ export async function POST(
     }, { status: 400 });
   }
 
-  try {
-    const call = streamServerClient().video.call("livestream", id);
-    const response = await call.get();
-    if (response.call.team !== consent.tenantId) {
-      return NextResponse.json({ error: "tenant mismatch" }, { status: 403 });
-    }
-    const currentCustom = response.call.custom || {};
-    const payloadHash = crypto.createHash("sha256").update(rawBody).digest("hex");
-    if (currentCustom.recording_consent_idempotency_key === idempotencyKey) {
-      if (!safeEqual(String(currentCustom.recording_consent_payload_hash || ""), payloadHash)) {
-        return NextResponse.json({ error: "idempotency conflict" }, { status: 409 });
-      }
-      return NextResponse.json({ accepted: true, replay: true });
-    }
-
-    await call.update({
-      custom: {
-        ...currentCustom,
-        ...recordingConsentCustom(consent, idempotencyKey, rawBody),
-      },
-    });
-    return NextResponse.json({ accepted: true, replay: false });
-  } catch {
-    return NextResponse.json({ error: "recording consent update failed" }, { status: 502 });
-  }
+  return forwardMiltonControl(`/api/webinars/${encodeURIComponent(id)}/recording-consent`, rawBody, {
+    timestamp,
+    signature,
+    idempotencyKey,
+  });
 }

@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canAccessWebinar, canManageWebinars, safeReturnPath } from "../lib/webinar/access.ts";
+import {
+  canAccessWebinar,
+  canManageWebinars,
+  hasWebinarCallScope,
+  safeReturnPath,
+} from "../lib/webinar/access.ts";
 
 const attendee = {
   sub: "attendee-1",
@@ -24,4 +29,12 @@ test("handoff redirects stay local", () => {
   assert.equal(safeReturnPath("https://evil.example"), "/");
   assert.equal(safeReturnPath("//evil.example"), "/");
   assert.equal(safeReturnPath("/\\evil"), "/");
+});
+
+test("call scope always enforces the Milton tenant boundary", () => {
+  assert.equal(hasWebinarCallScope(attendee, "allowed_call", "milton-demo"), true);
+  assert.equal(hasWebinarCallScope(attendee, "allowed_call", "other-tenant"), false);
+  assert.equal(hasWebinarCallScope({ ...attendee, role: "host" }, "other_call", "milton-demo"), true);
+  assert.equal(hasWebinarCallScope({ ...attendee, role: "host" }, "other_call", "other-tenant"), false);
+  assert.equal(hasWebinarCallScope(attendee, "allowed_call", "milton-demo", { manage: true }), false);
 });

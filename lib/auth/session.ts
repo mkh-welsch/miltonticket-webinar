@@ -24,6 +24,7 @@ export function openMiltonHandoff(token: string) {
     secret: requiredSecret("MILTON_WEBINAR_HANDOFF_SECRET"),
     audience: HANDOFF_AUDIENCE,
     issuer: HANDOFF_ISSUER,
+    maxLifetimeSeconds: 10 * 60,
   });
 }
 

@@ -3,22 +3,16 @@
 import crypto from "node:crypto";
 import { requireWebinarSession } from "@/lib/auth/session";
 import { canManageWebinars } from "@/lib/webinar/access";
+import { authorizedWebinarCall } from "@/lib/webinar/call-access";
 import {
   recordingConsentFromCustom,
   recordingEnabled,
 } from "@/lib/webinar/recording-policy";
 import { provisionStreamIdentity, streamServerClient } from "@/lib/webinar/stream-server";
 
-const CALL_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,127}$/;
-
 async function manageableCall(callId: string) {
   const user = await requireWebinarSession();
-  if (!canManageWebinars(user)) throw new Error("Diese Rolle darf das Webinar nicht steuern.");
-  if (!CALL_ID_PATTERN.test(callId)) throw new Error("Ungültige Webinar-ID.");
-  const call = streamServerClient().video.call("livestream", callId);
-  const response = await call.get();
-  if (response.call.team !== user.tenantId) throw new Error("Das Webinar gehört zu einem anderen Mandanten.");
-  return { call, custom: response.call.custom || {} };
+  return authorizedWebinarCall(user, callId, { manage: true });
 }
 
 export default async function tokenProvider() {

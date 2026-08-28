@@ -91,6 +91,7 @@ export function verifySignedWebinarToken(
     secret: string;
     audience: string;
     issuer: string;
+    maxLifetimeSeconds?: number;
     now?: Date;
   },
 ): WebinarIdentity {
@@ -113,12 +114,15 @@ export function verifySignedWebinarToken(
   }
 
   const now = Math.floor((options.now || new Date()).getTime() / 1000);
+  const lifetime = Number(claims.exp) - Number(claims.iat);
   if (
     claims.v !== 1 ||
     claims.aud !== options.audience ||
     claims.iss !== options.issuer ||
     !Number.isFinite(claims.iat) ||
     !Number.isFinite(claims.exp) ||
+    lifetime <= 0 ||
+    (options.maxLifetimeSeconds !== undefined && lifetime > options.maxLifetimeSeconds) ||
     Number(claims.iat) > now + 60 ||
     Number(claims.exp) <= now
   ) {

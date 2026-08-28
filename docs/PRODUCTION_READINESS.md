@@ -6,6 +6,7 @@ Der Status bleibt **nicht production ready**, bis alle Gates bestanden sind.
 
 - Stream-Vertrag, AVV/DPA, Subprozessoren, Region und Löschfristen freigegeben.
 - `livestream`-Call-Type mit Backstage sowie minimalen Host-/Teilnehmer-Capabilities geprüft.
+- Host- und Teilnehmerzugriff gegen Call-Mandant und Mitgliedschaft begrenzt; keine mandantenübergreifende Call-Abfrage erlaubt.
 - Aufzeichnung und Transkription standardmäßig aus; explizite Einwilligungs- und Hinweistexte vorhanden.
 - Aufbewahrung, Export, Löschung und Incident-Prozess für Aufzeichnungen dokumentiert.
 - Browserrollen besitzen keine direkte Stream-Capability zum Starten einer Aufzeichnung; Aufnahme und Löschung laufen ausschließlich über die signierte Milton-Steuerung.

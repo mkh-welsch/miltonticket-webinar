@@ -77,3 +77,20 @@ test("attendee access is bounded to validated call ids", () => {
     now,
   }));
 });
+
+test("handoff verification rejects tickets valid for more than ten minutes", () => {
+  const token = createSignedWebinarToken(identity, {
+    secret,
+    audience: "miltonticket-webinar-handoff",
+    issuer: "miltonticket-app",
+    ttlSeconds: 601,
+    now,
+  });
+  assert.throws(() => verifySignedWebinarToken(token, {
+    secret,
+    audience: "miltonticket-webinar-handoff",
+    issuer: "miltonticket-app",
+    maxLifetimeSeconds: 600,
+    now,
+  }));
+});

@@ -8,6 +8,7 @@ Der Status bleibt **nicht production ready**, bis alle Gates bestanden sind.
 - `livestream`-Call-Type mit Backstage sowie minimalen Host-/Teilnehmer-Capabilities geprüft.
 - Aufzeichnung und Transkription standardmäßig aus; explizite Einwilligungs- und Hinweistexte vorhanden.
 - Aufbewahrung, Export, Löschung und Incident-Prozess für Aufzeichnungen dokumentiert.
+- Browserrollen besitzen keine direkte Stream-Capability zum Starten einer Aufzeichnung; Aufnahme und Löschung laufen ausschließlich über die signierte Milton-Steuerung.
 - Kostenalarm und monatliches Minutenbudget eingerichtet. Das Stream-Freikontingent ist kein SLA.
 
 ## Deployment

@@ -28,6 +28,37 @@ test("normalizes an attendee join without forwarding personal profile data", () 
     sessionId: "session-1",
     participantId: "registration-42",
     recordingUrl: null,
+    recordingFilename: null,
+    recordingSessionId: null,
+    recordingType: null,
+  });
+});
+
+test("normalizes recording deletion identifiers without profile data", () => {
+  assert.deepEqual(normalizeStreamEvent({
+    type: "call.recording_ready",
+    call_cid: "livestream:webinar_123",
+    created_at: "2026-08-28T10:45:00Z",
+    recording_type: "composite",
+    call_recording: {
+      url: "https://recordings.example/recording.mp4",
+      filename: "recording.mp4",
+      session_id: "session-1",
+      recording_type: "composite",
+    },
+  }, "webhook-recording-1"), {
+    version: 1,
+    provider: "stream-video",
+    eventId: "webhook-recording-1",
+    type: "call.recording_ready",
+    occurredAt: "2026-08-28T10:45:00Z",
+    callId: "webinar_123",
+    sessionId: null,
+    participantId: null,
+    recordingUrl: "https://recordings.example/recording.mp4",
+    recordingFilename: "recording.mp4",
+    recordingSessionId: "session-1",
+    recordingType: "composite",
   });
 });
 

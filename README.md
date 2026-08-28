@@ -38,6 +38,9 @@ Ohne Stream-Zugangsdaten zeigt die geschützte Anwendung einen klaren Einrichtun
 | `WEBINAR_SESSION_SECRET` | Server | Signiert die lokale HTTP-only Sitzung |
 | `MILTON_API_BASE_URL` | Server | Zielbasis für normalisierte Webinar-Ereignisse |
 | `MILTON_WEBINAR_EVENTS_SECRET` | Server, geteilt | Signiert den Ereignis-Rückfluss an Milton Ticket |
+| `MILTON_WEBINAR_CONTROL_SECRET` | Server, geteilt | Prüft zeitgebundene Einwilligungs- und Löschbefehle von Milton |
+| `WEBINAR_RECORDING_ENABLED` | Server | Fail-closed Freigabe für Aufzeichnungen; standardmäßig `false` |
+| `WEBINAR_RECORDING_MAX_RETENTION_DAYS` | Server | Harte Obergrenze für die Aufbewahrung, Standard 30 Tage |
 | `WEBINAR_DEMO_MODE` | lokal | Aktiviert ausschließlich lokal die Demo-Sitzung |
 
 Alle HMAC-Secrets müssen unterschiedlich, stabil und mindestens 32 Zeichen lang sein. `STREAM_SECRET_KEY` darf nie mit `NEXT_PUBLIC_` beginnen oder an den Browser ausgeliefert werden.

@@ -3,7 +3,23 @@
 import crypto from "node:crypto";
 import { requireWebinarSession } from "@/lib/auth/session";
 import { canManageWebinars } from "@/lib/webinar/access";
+import {
+  recordingConsentFromCustom,
+  recordingEnabled,
+} from "@/lib/webinar/recording-policy";
 import { provisionStreamIdentity, streamServerClient } from "@/lib/webinar/stream-server";
+
+const CALL_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,127}$/;
+
+async function manageableCall(callId: string) {
+  const user = await requireWebinarSession();
+  if (!canManageWebinars(user)) throw new Error("Diese Rolle darf das Webinar nicht steuern.");
+  if (!CALL_ID_PATTERN.test(callId)) throw new Error("Ungültige Webinar-ID.");
+  const call = streamServerClient().video.call("livestream", callId);
+  const response = await call.get();
+  if (response.call.team !== user.tenantId) throw new Error("Das Webinar gehört zu einem anderen Mandanten.");
+  return { call, custom: response.call.custom || {} };
+}
 
 export default async function tokenProvider() {
   const user = await requireWebinarSession();
@@ -62,4 +78,37 @@ export async function createWebinar(input: {
     description,
     startsAt: startsAt.toISOString(),
   };
+}
+
+export async function startWebinarBroadcast(input: { callId: string; recording: boolean }) {
+  const { call, custom } = await manageableCall(String(input.callId || ""));
+  let consent = null;
+  if (input.recording) {
+    if (!recordingEnabled()) throw new Error("Aufzeichnungen sind in dieser Umgebung deaktiviert.");
+    consent = recordingConsentFromCustom(custom);
+    if (!consent) throw new Error("Für dieses Webinar liegt keine gültige Aufzeichnungseinwilligung vor.");
+  }
+
+  await call.goLive({
+    start_recording: input.recording,
+    start_transcription: false,
+    start_closed_caption: false,
+    start_hls: false,
+  });
+  return {
+    live: true,
+    recording: input.recording,
+    consentReceiptId: consent?.receiptId || null,
+  };
+}
+
+export async function stopWebinarBroadcast(callId: string) {
+  const { call } = await manageableCall(String(callId || ""));
+  await call.stopLive({
+    continue_recording: false,
+    continue_transcription: false,
+    continue_closed_caption: false,
+    continue_hls: false,
+  });
+  return { live: false };
 }

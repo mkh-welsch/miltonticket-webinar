@@ -29,6 +29,9 @@ export type MiltonWebinarEvent = {
   sessionId: string | null;
   participantId: string | null;
   recordingUrl: string | null;
+  recordingFilename: string | null;
+  recordingSessionId: string | null;
+  recordingType: string | null;
 };
 
 function record(value: unknown): UnknownRecord {
@@ -81,6 +84,9 @@ export function normalizeStreamEvent(
     sessionId: text(event.session_id, 200),
     participantId: text(participant.user_id || participantUser.id, 200),
     recordingUrl: text(recording.url, 2048),
+    recordingFilename: text(recording.filename, 256),
+    recordingSessionId: text(recording.session_id, 200),
+    recordingType: text(event.recording_type || recording.recording_type, 40),
   };
 }
 

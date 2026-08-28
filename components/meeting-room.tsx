@@ -22,6 +22,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import EndCallButton from "./end-call-button";
 import Loader from "./loader";
 import type { WebinarIdentity } from "@/lib/auth/tokens";
+import { startWebinarBroadcast, stopWebinarBroadcast } from "@/actions/stream.actions";
+import { useToast } from "./ui/use-toast";
 
 type CallLayoutType = "grid" | "speaker-left" | "speaker-right";
 
@@ -32,11 +34,22 @@ const MeetingRoom = ({ identity }: { identity: WebinarIdentity }) => {
   const isPersonalRoom = !!searchParams.get("personal");
   const [layout, setLayout] = useState<CallLayoutType>("speaker-left");
   const [showParticipants, setShowParticipants] = useState<boolean>(false);
+  const [recordWithConsent, setRecordWithConsent] = useState(false);
+  const [broadcastPending, setBroadcastPending] = useState(false);
+  const { toast } = useToast();
 
-  const { useCallCallingState, useIsCallLive } = useCallStateHooks();
+  const { useCallCallingState, useIsCallLive, useIsCallRecordingInProgress } = useCallStateHooks();
   const callingState = useCallCallingState();
   const isLive = useIsCallLive();
+  const isRecording = useIsCallRecordingInProgress();
   const isHost = identity.role === "host" || identity.role === "administrator";
+  const callCustom = call?.state.custom || {};
+  const hasRecordingConsent = Boolean(
+    callCustom.recording_consent_receipt_id &&
+    callCustom.recording_consent_notice_version &&
+    callCustom.recording_consented_at &&
+    callCustom.recording_retention_days,
+  );
 
   if (callingState !== CallingState.JOINED) return <Loader />;
 
@@ -57,6 +70,12 @@ const MeetingRoom = ({ identity }: { identity: WebinarIdentity }) => {
         <span className={isLive ? "live-indicator active" : "live-indicator"} />
         <span>{isLive ? "Live" : isHost ? "Backstage" : "Warten auf den Host"}</span>
       </div>
+      {isRecording && (
+        <div className="recording-notice" role="status">
+          <span className="recording-dot" aria-hidden="true" />
+          <span>Diese Sitzung wird mit dokumentierter Einwilligung aufgezeichnet.</span>
+        </div>
+      )}
       <div className="relative flex size-full items-center justify-center">
         <div className="flex size-full max-w-[1000px] items-center">
           <CallLayout />
@@ -67,13 +86,41 @@ const MeetingRoom = ({ identity }: { identity: WebinarIdentity }) => {
       </div>
 
       <div className="fixed bottom-0 flex w-full flex-wrap items-center justify-center gap-5">
+        {isHost && !isLive && hasRecordingConsent && (
+          <label className="recording-consent-toggle">
+            <input
+              type="checkbox"
+              checked={recordWithConsent}
+              onChange={event => setRecordWithConsent(event.target.checked)}
+            />
+            <span>
+              Mit Einwilligung aufzeichnen · Löschung nach {Number(callCustom.recording_retention_days)} Tagen
+            </span>
+          </label>
+        )}
         {isHost && call && (
           <button
             className={isLive ? "broadcast-action stop" : "broadcast-action"}
-            onClick={() => isLive ? call.stopLive() : call.goLive({ start_recording: false })}
+            disabled={broadcastPending}
+            onClick={async () => {
+              setBroadcastPending(true);
+              try {
+                if (isLive) {
+                  await stopWebinarBroadcast(call.id);
+                } else {
+                  await startWebinarBroadcast({ callId: call.id, recording: recordWithConsent });
+                }
+              } catch (error) {
+                toast({
+                  title: error instanceof Error ? error.message : "Webinar-Status konnte nicht geändert werden",
+                });
+              } finally {
+                setBroadcastPending(false);
+              }
+            }}
             type="button"
           >
-            {isLive ? "Übertragung stoppen" : "Webinar live schalten"}
+            {broadcastPending ? "Bitte warten …" : isLive ? "Übertragung stoppen" : "Webinar live schalten"}
           </button>
         )}
         <CallControls onLeave={() => router.push("/")} />

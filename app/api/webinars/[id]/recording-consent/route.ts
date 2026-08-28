@@ -1,0 +1,80 @@
+import crypto from "node:crypto";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyMiltonControlRequest } from "@/lib/webinar/control-auth";
+import {
+  normalizeRecordingConsent,
+  recordingConsentCustom,
+  recordingMaxRetentionDays,
+} from "@/lib/webinar/recording-policy";
+import { streamServerClient } from "@/lib/webinar/stream-server";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+const CALL_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,127}$/;
+const IDEMPOTENCY_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{7,199}$/;
+
+function safeEqual(left: string, right: string) {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  if (!CALL_ID_PATTERN.test(id)) return NextResponse.json({ error: "invalid call" }, { status: 400 });
+
+  const rawBody = await request.text();
+  const timestamp = request.headers.get("x-milton-timestamp") || "";
+  const signature = request.headers.get("x-milton-signature") || "";
+  const idempotencyKey = request.headers.get("idempotency-key") || "";
+  const secret = String(process.env.MILTON_WEBINAR_CONTROL_SECRET || "");
+  if (!IDEMPOTENCY_PATTERN.test(idempotencyKey) || !verifyMiltonControlRequest({
+    body: rawBody,
+    timestamp,
+    signature,
+    secret,
+  })) {
+    return NextResponse.json({ error: "invalid control request" }, { status: 401 });
+  }
+
+  let consent;
+  try {
+    consent = normalizeRecordingConsent(JSON.parse(rawBody), {
+      maxRetentionDays: recordingMaxRetentionDays(),
+    });
+  } catch (error) {
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : "invalid consent",
+    }, { status: 400 });
+  }
+
+  try {
+    const call = streamServerClient().video.call("livestream", id);
+    const response = await call.get();
+    if (response.call.team !== consent.tenantId) {
+      return NextResponse.json({ error: "tenant mismatch" }, { status: 403 });
+    }
+    const currentCustom = response.call.custom || {};
+    const payloadHash = crypto.createHash("sha256").update(rawBody).digest("hex");
+    if (currentCustom.recording_consent_idempotency_key === idempotencyKey) {
+      if (!safeEqual(String(currentCustom.recording_consent_payload_hash || ""), payloadHash)) {
+        return NextResponse.json({ error: "idempotency conflict" }, { status: 409 });
+      }
+      return NextResponse.json({ accepted: true, replay: true });
+    }
+
+    await call.update({
+      custom: {
+        ...currentCustom,
+        ...recordingConsentCustom(consent, idempotencyKey, rawBody),
+      },
+    });
+    return NextResponse.json({ accepted: true, replay: false });
+  } catch {
+    return NextResponse.json({ error: "recording consent update failed" }, { status: 502 });
+  }
+}

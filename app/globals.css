@@ -331,6 +331,40 @@ body {
 
 .broadcast-action { min-height: 2.5rem; border-radius: 0.7rem; padding: 0 1rem; background: var(--milton-accent); color: #0c1a16; font-size: 0.78rem; font-weight: 750; }
 .broadcast-action.stop { background: var(--milton-danger); color: #fff; }
+.broadcast-action:disabled { cursor: wait; opacity: 0.62; }
+
+.recording-notice {
+  position: fixed;
+  top: 4.25rem;
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  transform: translateX(-50%);
+  align-items: center;
+  gap: 0.55rem;
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  border: 1px solid rgba(255, 111, 111, 0.35);
+  border-radius: 0.75rem;
+  padding: 0.55rem 0.8rem;
+  background: rgba(42, 15, 15, 0.92);
+  color: #ffe3e3;
+  font-size: 0.75rem;
+}
+.recording-dot { width: 0.55rem; height: 0.55rem; flex: 0 0 auto; border-radius: 999px; background: var(--milton-danger); }
+.recording-consent-toggle {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid var(--milton-line);
+  border-radius: 0.7rem;
+  padding: 0 0.85rem;
+  background: rgba(17, 23, 22, 0.92);
+  color: var(--milton-muted);
+  font-size: 0.72rem;
+}
+.recording-consent-toggle input { accent-color: var(--milton-accent); }
 
 @media (min-width: 900px) {
   .webinar-action-list { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 2.5rem; }

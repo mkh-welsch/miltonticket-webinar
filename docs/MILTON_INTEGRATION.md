@@ -44,6 +44,16 @@ Die gemeinsamen Haken werden erst nach Diff-Abstimmung im Hauptrepository umgese
 
 Jeder schreibende Vertrag benötigt `tenantId`, eine Idempotency-Key-Prüfung, Rollenprüfung, Audit-Eintrag und eine erlaubte Zustandsänderung.
 
+## Aufnahme-Einwilligung und Löschung
+
+Milton übermittelt eine Einwilligungsquittung an `POST /api/webinars/:id/recording-consent`. Der JSON-Body enthält `receiptId`, `tenantId`, `noticeVersion`, `consentedAt` und `retentionDays`. Löschungen werden mit `POST /api/webinars/:id/recordings/delete` und `tenantId`, `sessionId`, `filename` sowie einem der Gründe `retention_expired`, `consent_withdrawn` oder `admin_request` beauftragt.
+
+Beide Routen verlangen `Idempotency-Key`, `X-Milton-Timestamp` als Unix-Sekunden und `X-Milton-Signature = HMAC-SHA256(timestamp + "." + rawBody)` mit dem eigenen `MILTON_WEBINAR_CONTROL_SECRET`. Anfragen außerhalb von fünf Minuten Zeitabweichung werden abgewiesen. Die Mandantenzuordnung wird immer gegen den serverseitigen Stream-Call geprüft.
+
+Der Lösch-Endpunkt speichert die zuletzt bestätigte Löschoperation zusätzlich am Stream-Call. Milton muss bei Wiederholungen denselben stabilen Idempotency-Key senden und bleibt für die dauerhafte, aufzeichnungsübergreifende Deduplizierung führend.
+
+Eine Aufzeichnung startet nur, wenn `WEBINAR_RECORDING_ENABLED=true` gesetzt ist und am Call eine gültige Einwilligungsquittung mit einer Retention innerhalb von `WEBINAR_RECORDING_MAX_RETENTION_DAYS` hinterlegt wurde. Transkription, Closed Captions und HLS werden dadurch nicht automatisch aktiviert. Der Stream-Call-Type muss die Aufnahmeberechtigung für Browserrollen entziehen, sodass nur die serverseitige Steuerung aufnehmen kann.
+
 ## Stream-Webhooks
 
 Die Webinar-App muss Provider-Webhooks authentifizieren, Rohpayload und Signatur vor JSON-Verarbeitung prüfen und mindestens folgende Ereignisse idempotent normalisieren:
@@ -54,7 +64,7 @@ Die Webinar-App muss Provider-Webhooks authentifizieren, Rohpayload und Signatur
 - Transkription bereit/fehlgeschlagen,
 - Session gestartet/beendet.
 
-An Milton gehen nur normalisierte Ereignisse mit stabiler Event-ID, Call-ID, Ereignistyp, Provider-Zeitpunkt und – sofern vorhanden – Session-ID, stabiler Registrierungs-ID und Recording-URL. E-Mail, Name und technische Verbindungsdaten werden nicht weitergeleitet und dürfen nicht in Logs landen. Der Milton-Empfänger leitet den Mandanten ausschließlich aus der serverseitig gespeicherten Call-ID ab; ein Provider-Payload darf keinen Mandanten bestimmen.
+An Milton gehen nur normalisierte Ereignisse mit stabiler Event-ID, Call-ID, Ereignistyp, Provider-Zeitpunkt und – sofern vorhanden – Session-ID, stabiler Registrierungs-ID sowie Recording-URL, Dateiname, Recording-Session-ID und Typ. E-Mail, Name und technische Verbindungsdaten werden nicht weitergeleitet und dürfen nicht in Logs landen. Der Milton-Empfänger leitet den Mandanten ausschließlich aus der serverseitig gespeicherten Call-ID ab; ein Provider-Payload darf keinen Mandanten bestimmen.
 
 ## Rollen
 

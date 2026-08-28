@@ -40,7 +40,8 @@
     "prettier": "^3.9.6",
     "tailwindcss": "^3.4.1",
     "tailwindcss-animate": "1.0.7",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vercel": "59.9.1"
   },
   "engines": {
     "node": ">=22.13.0"

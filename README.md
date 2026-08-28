@@ -56,3 +56,5 @@ Ein Build ohne echte Stream-Zugangsdaten beweist nur die App-Buildfähigkeit. Pr
 ## Deployment
 
 Ziel ist ein eigenes Vercel-Projekt unter `webinar.miltonticket.app`. Die Video-/Audioübertragung läuft über Stream Video, nicht über Vercel Functions. Details zu Milton-Verträgen, Webhooks und Rollout enthält [`docs/MILTON_INTEGRATION.md`](./docs/MILTON_INTEGRATION.md).
+
+Der Workflow `Manual Vercel Preview` läuft ausschließlich über `workflow_dispatch`. Er verlangt den vollständigen freigegebenen Commit-SHA, die offene PR-Nummer und eine Freigabereferenz, prüft den erfolgreichen Quality-Check für exakt diesen Commit und deployt ausschließlich in die Vercel-Preview-Umgebung. Das GitHub-Environment `webinar-preview` soll mit Required Reviewers sowie den Secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID` und `VERCEL_PROJECT_ID` geschützt werden. Es existiert kein automatischer oder Production-Deploy-Workflow.

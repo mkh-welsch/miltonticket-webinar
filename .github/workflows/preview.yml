@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       pull_request_number:
-        description: Open pull request whose head must equal commit_sha
+        description: Pull request whose head must equal commit_sha
         required: true
         type: string
       approval_reference:
@@ -64,8 +64,9 @@ jobs:
               repo: context.repo.repo,
               pull_number: pullNumber,
             });
-            if (pull.state !== "open" || pull.draft) {
-              core.setFailed("The referenced pull request must be open and ready for review.");
+            const isReviewable = pull.state === "open" && !pull.draft;
+            if (!isReviewable && !pull.merged) {
+              core.setFailed("The referenced pull request must be reviewable or merged, never closed unmerged.");
               return;
             }
             if (pull.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`) {

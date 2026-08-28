@@ -17,6 +17,7 @@ Der Status bleibt **nicht production ready**, bis alle Gates bestanden sind.
 - Eigenes Vercel-Projekt mit Preview, Staging und Production.
 - GitHub-Environment `webinar-preview` mit Required Reviewers und getrennten Vercel-Secrets eingerichtet; manuelle Preview nur für den freigegebenen PR-Head-SHA auslösen.
 - Production-Domain `webinar.miltonticket.app`, TLS, CSP und erlaubte Origins geprüft.
+- CSP erlaubt Stream-Signaling nur zu den offiziellen `stream-io-video.com`, `stream-io-api.com` und `getstream.io`-Hosts; Abweichungen werden in der Preview-Browserkonsole geprüft.
 - Secrets pro Umgebung getrennt; keine Preview-Secrets in Production.
 - Stream-Webhooks auf stabile HTTPS-Route mit Signaturprüfung konfiguriert.
 - Monitoring für Handoff-, Token-, Provider-, Recording- und Webhook-Fehler aktiv.

@@ -1,23 +1,15 @@
-import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { verifyMiltonControlRequest } from "@/lib/webinar/control-auth";
+import { signMiltonControlRequest, verifyMiltonControlRequest } from "@/lib/webinar/control-auth";
 import {
   normalizeRecordingDeletion,
-  recordingDeletionCustom,
 } from "@/lib/webinar/recording-policy";
-import { streamServerClient } from "@/lib/webinar/stream-server";
+import { forwardMiltonControl } from "@/lib/milton-api";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const CALL_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,127}$/;
 const IDEMPOTENCY_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{7,199}$/;
-
-function safeEqual(left: string, right: string) {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
-}
 
 export async function POST(
   request: NextRequest,
@@ -43,6 +35,9 @@ export async function POST(
     timestamp,
     signature,
     secret: String(process.env.MILTON_WEBINAR_CONTROL_SECRET || ""),
+    method: "POST",
+    path: `/api/webinars/${encodeURIComponent(id)}/recordings/delete`,
+    idempotencyKey,
   })) {
     return NextResponse.json({ error: "invalid control request" }, { status: 401 });
   }
@@ -56,42 +51,20 @@ export async function POST(
     }, { status: 400 });
   }
 
-  try {
-    const call = streamServerClient().video.call("livestream", id);
-    const response = await call.get();
-    if (response.call.team !== deletion.tenantId) {
-      return NextResponse.json({ error: "tenant mismatch" }, { status: 403 });
-    }
-    const currentCustom = response.call.custom || {};
-    const payloadHash = crypto.createHash("sha256").update(rawBody).digest("hex");
-    if (currentCustom.recording_deletion_idempotency_key === idempotencyKey) {
-      if (!safeEqual(String(currentCustom.recording_deletion_payload_hash || ""), payloadHash)) {
-        return NextResponse.json({ error: "idempotency conflict" }, { status: 409 });
-      }
-      return NextResponse.json({
-        accepted: true,
-        replay: true,
-        idempotencyKey,
-        reason: deletion.reason,
-      });
-    }
-    await call.deleteRecording({
-      session: deletion.sessionId,
-      filename: deletion.filename,
-    });
-    await call.update({
-      custom: {
-        ...currentCustom,
-        ...recordingDeletionCustom(deletion, idempotencyKey, rawBody),
-      },
-    });
-    return NextResponse.json({
-      accepted: true,
-      replay: false,
-      idempotencyKey,
-      reason: deletion.reason,
-    });
-  } catch {
-    return NextResponse.json({ error: "recording deletion failed" }, { status: 502 });
-  }
+  const canonicalBody = JSON.stringify({
+    tenantId: deletion.tenantId,
+    sessionId: deletion.sessionId,
+    filename: deletion.filename,
+    reason: deletion.reason === "consent_withdrawn" ? "consent_revoked" : deletion.reason,
+  });
+  const canonicalPath = `/api/webinars/${encodeURIComponent(id)}/recordings/delete`;
+  const secret = String(process.env.MILTON_WEBINAR_CONTROL_SECRET || "");
+  const canonicalSignature = signMiltonControlRequest(canonicalBody, timestamp, secret, {
+    method: "POST", path: canonicalPath, idempotencyKey,
+  });
+  return forwardMiltonControl(canonicalPath, canonicalBody, {
+    timestamp,
+    signature: canonicalSignature,
+    idempotencyKey,
+  });
 }

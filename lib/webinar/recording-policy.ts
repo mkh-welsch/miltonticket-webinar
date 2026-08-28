@@ -90,6 +90,8 @@ export function recordingConsentFromCustom(custom: Record<string, unknown>) {
 
 export function recordingConsentCustom(consent: RecordingConsent, idempotencyKey: string, rawBody: string) {
   return {
+    registration_id: consent.registrationId,
+    recording_consent_status: consent.status,
     recording_consent_receipt_id: consent.receiptId,
     recording_consent_notice_version: consent.noticeVersion,
     recording_consented_at: consent.consentedAt,

@@ -27,7 +27,15 @@ export async function POST(
   const { id } = await params;
   if (!CALL_ID_PATTERN.test(id)) return NextResponse.json({ error: "invalid call" }, { status: 400 });
 
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (Number.isFinite(contentLength) && contentLength > 16 * 1024) {
+    return NextResponse.json({ error: "control payload too large" }, { status: 413 });
+  }
+
   const rawBody = await request.text();
+  if (Buffer.byteLength(rawBody, "utf8") > 16 * 1024) {
+    return NextResponse.json({ error: "control payload too large" }, { status: 413 });
+  }
   const timestamp = request.headers.get("x-milton-timestamp") || "";
   const signature = request.headers.get("x-milton-signature") || "";
   const idempotencyKey = request.headers.get("idempotency-key") || "";

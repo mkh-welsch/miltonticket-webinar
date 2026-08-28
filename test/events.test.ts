@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import crypto from "node:crypto";
-import { normalizeStreamEvent, signMiltonEvent } from "../lib/webinar/events.ts";
+import {
+  miltonEventEndpoint,
+  normalizeStreamEvent,
+  signMiltonEvent,
+} from "../lib/webinar/events.ts";
 
 test("normalizes an attendee join without forwarding personal profile data", () => {
   const result = normalizeStreamEvent({
@@ -23,7 +27,7 @@ test("normalizes an attendee join without forwarding personal profile data", () 
     provider: "stream-video",
     eventId: "webhook-1",
     type: "call.session_participant_joined",
-    occurredAt: "2026-08-28T10:15:00Z",
+    occurredAt: "2026-08-28T10:15:00.000Z",
     callId: "webinar_123",
     sessionId: "session-1",
     participantId: "registration-42",
@@ -51,7 +55,7 @@ test("normalizes recording deletion identifiers without profile data", () => {
     provider: "stream-video",
     eventId: "webhook-recording-1",
     type: "call.recording_ready",
-    occurredAt: "2026-08-28T10:45:00Z",
+    occurredAt: "2026-08-28T10:45:00.000Z",
     callId: "webinar_123",
     sessionId: null,
     participantId: null,
@@ -82,4 +86,32 @@ test("signs the exact outbound body with the dedicated secret", () => {
     signMiltonEvent(body, secret),
     crypto.createHmac("sha256", secret).update(body).digest("hex"),
   );
+});
+
+test("normalizes timestamps and drops unsafe recording locations", () => {
+  const event = normalizeStreamEvent({
+    type: "call.recording_ready",
+    call_cid: "livestream:webinar_123",
+    created_at: "2026-08-28T12:00:00+02:00",
+    call_recording: {
+      url: "javascript:alert(1)",
+      filename: "../recording.mp4",
+    },
+  }, "webhook-safe-recording");
+  assert.equal(event?.occurredAt, "2026-08-28T10:00:00.000Z");
+  assert.equal(event?.recordingUrl, null);
+  assert.equal(event?.recordingFilename, null);
+});
+
+test("Milton event delivery requires HTTPS outside local development", () => {
+  assert.equal(
+    miltonEventEndpoint("https://miltonticket.app/"),
+    "https://miltonticket.app/api/webinars/events",
+  );
+  assert.equal(
+    miltonEventEndpoint("http://localhost:3000", true),
+    "http://localhost:3000/api/webinars/events",
+  );
+  assert.throws(() => miltonEventEndpoint("http://miltonticket.app"), /HTTPS/);
+  assert.throws(() => miltonEventEndpoint("https://user:password@miltonticket.app"), /HTTPS/);
 });

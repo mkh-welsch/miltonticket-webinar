@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyMiltonControlRequest } from "@/lib/webinar/control-auth";
+import { signMiltonControlRequest, verifyMiltonControlRequest } from "@/lib/webinar/control-auth";
 import {
   normalizeRecordingDeletion,
 } from "@/lib/webinar/recording-policy";
@@ -35,6 +35,9 @@ export async function POST(
     timestamp,
     signature,
     secret: String(process.env.MILTON_WEBINAR_CONTROL_SECRET || ""),
+    method: "POST",
+    path: `/api/webinars/${encodeURIComponent(id)}/recordings/delete`,
+    idempotencyKey,
   })) {
     return NextResponse.json({ error: "invalid control request" }, { status: 401 });
   }
@@ -48,9 +51,20 @@ export async function POST(
     }, { status: 400 });
   }
 
-  return forwardMiltonControl(`/api/webinars/${encodeURIComponent(id)}/recordings/delete`, rawBody, {
+  const canonicalBody = JSON.stringify({
+    tenantId: deletion.tenantId,
+    sessionId: deletion.sessionId,
+    filename: deletion.filename,
+    reason: deletion.reason === "consent_withdrawn" ? "consent_revoked" : deletion.reason,
+  });
+  const canonicalPath = `/api/webinars/${encodeURIComponent(id)}/recordings/delete`;
+  const secret = String(process.env.MILTON_WEBINAR_CONTROL_SECRET || "");
+  const canonicalSignature = signMiltonControlRequest(canonicalBody, timestamp, secret, {
+    method: "POST", path: canonicalPath, idempotencyKey,
+  });
+  return forwardMiltonControl(canonicalPath, canonicalBody, {
     timestamp,
-    signature,
+    signature: canonicalSignature,
     idempotencyKey,
   });
 }

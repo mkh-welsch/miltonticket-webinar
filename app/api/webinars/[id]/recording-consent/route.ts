@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyMiltonControlRequest } from "@/lib/webinar/control-auth";
+import { signMiltonControlRequest, verifyMiltonControlRequest } from "@/lib/webinar/control-auth";
 import {
   normalizeRecordingConsent,
   recordingMaxRetentionDays,
@@ -37,6 +37,9 @@ export async function POST(
     timestamp,
     signature,
     secret,
+    method: "POST",
+    path: `/api/webinars/${encodeURIComponent(id)}/recording-consent`,
+    idempotencyKey,
   })) {
     return NextResponse.json({ error: "invalid control request" }, { status: 401 });
   }
@@ -45,6 +48,7 @@ export async function POST(
   try {
     consent = normalizeRecordingConsent(JSON.parse(rawBody), {
       maxRetentionDays: recordingMaxRetentionDays(),
+      requireRegistrationId: true,
     });
   } catch (error) {
     return NextResponse.json({
@@ -52,9 +56,21 @@ export async function POST(
     }, { status: 400 });
   }
 
-  return forwardMiltonControl(`/api/webinars/${encodeURIComponent(id)}/recording-consent`, rawBody, {
+  const canonicalBody = JSON.stringify({
+    tenantId: consent.tenantId,
+    registrationId: consent.registrationId,
+    status: consent.status,
+    receiptId: consent.receiptId || undefined,
+    capturedAt: consent.status === "granted" ? consent.capturedAt : undefined,
+    revokedAt: consent.status === "revoked" ? consent.revokedAt : undefined,
+  });
+  const canonicalPath = `/api/webinars/${encodeURIComponent(id)}/recording-consent`;
+  const canonicalSignature = signMiltonControlRequest(canonicalBody, timestamp, secret, {
+    method: "POST", path: canonicalPath, idempotencyKey,
+  });
+  return forwardMiltonControl(canonicalPath, canonicalBody, {
     timestamp,
-    signature,
+    signature: canonicalSignature,
     idempotencyKey,
   });
 }

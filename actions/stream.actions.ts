@@ -17,6 +17,7 @@ async function manageableCall(callId: string) {
 
 export default async function tokenProvider() {
   const user = await requireWebinarSession();
+  if (user.streamToken) return user.streamToken;
   const client = streamServerClient();
   await provisionStreamIdentity(user);
   const exp = Math.round(new Date().getTime() / 1000) + 60 * 60;

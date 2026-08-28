@@ -1,4 +1,5 @@
 import "server-only";
+import crypto from "node:crypto";
 
 import { cookies } from "next/headers";
 import {
@@ -20,12 +21,32 @@ function requiredSecret(name: "WEBINAR_SESSION_SECRET" | "MILTON_WEBINAR_HANDOFF
 }
 
 export function openMiltonHandoff(token: string) {
-  return verifySignedWebinarToken(token, {
+  const identity = verifySignedWebinarToken(token, {
     secret: requiredSecret("MILTON_WEBINAR_HANDOFF_SECRET"),
     audience: HANDOFF_AUDIENCE,
     issuer: HANDOFF_ISSUER,
     maxLifetimeSeconds: 10 * 60,
   });
+  if (!identity.handoffJti || !identity.handoffIat || !identity.handoffExp) {
+    throw new Error("Das Webinar-Handoff enthält keine Replay-Claims.");
+  }
+  return identity;
+}
+
+export async function consumeMiltonHandoff(token: string, callId: string) {
+  const baseUrl = String(process.env.MILTON_API_BASE_URL || "").trim().replace(/\/$/, "");
+  if (!baseUrl) throw new Error("MILTON_API_BASE_URL ist nicht konfiguriert.");
+  const response = await fetch(`${baseUrl}/api/webinars/${encodeURIComponent(callId)}/handoff/consume`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "idempotency-key": `handoff-${crypto.randomUUID()}` },
+    body: JSON.stringify({ token }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(4_000),
+  });
+  if (!response.ok) throw new Error("Das Webinar-Handoff konnte nicht verbraucht werden.");
+  const payload = await response.json() as Record<string, unknown>;
+  if (!payload.streamToken || payload.callId !== callId) throw new Error("Das Webinar-Handoff ist unvollständig.");
+  return payload;
 }
 
 export function createWebinarSessionToken(identity: WebinarIdentity, ttlSeconds = 8 * 60 * 60) {
